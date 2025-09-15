@@ -1,0 +1,68 @@
+service: websocket-layer
+
+provider:
+  name: aws
+  runtime: nodejs20.x
+  region: ${env:AWS_REGION, 'eu-north-1'}
+  stage: ${opt:stage, 'production'}
+  environment:
+    CONNECTIONS_TABLE: ${self:custom.connectionsTableName}
+  iam:
+    role:
+      statements:
+        # Allow connect/disconnect lambdas to put/delete items in the connections table
+        - Effect: Allow
+          Action:
+            - dynamodb:PutItem
+            - dynamodb:DeleteItem
+            - dynamodb:Query
+            - dynamodb:Scan
+          Resource:
+            - arn:aws:dynamodb:${self:provider.region}:*:table/${self:custom.connectionsTableName}
+
+plugins:
+  - serverless-esbuild
+
+custom:
+  connectionsTableName: ${self:service}-${self:provider.stage}-connections
+  esbuild:
+    bundle: true
+    platform: node
+    target: node20
+    sourcemap: false
+    minify: false
+    concurrency: 10
+
+functions:
+  connect:
+    handler: src/websocket/connect.handler
+    events:
+      - websocket:
+          route: $connect
+  disconnect:
+    handler: src/websocket/disconnect.handler
+    events:
+      - websocket:
+          route: $disconnect
+
+resources:
+  Resources:
+    ConnectionsTable:
+      Type: AWS::DynamoDB::Table
+      Properties:
+        TableName: ${self:custom.connectionsTableName}
+        BillingMode: PAY_PER_REQUEST
+        AttributeDefinitions:
+          - AttributeName: user_id
+            AttributeType: S
+          - AttributeName: connection_id
+            AttributeType: S
+        KeySchema:
+          - AttributeName: user_id
+            KeyType: HASH
+          - AttributeName: connection_id
+            KeyType: RANGE
+        TimeToLiveSpecification:
+          AttributeName: ttl
+          Enabled: true
+
