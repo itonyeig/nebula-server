@@ -8,18 +8,9 @@ import { ResponseFormatter } from './common/interceptors/response-formatter.inte
 export class AppController {
   constructor(private readonly appService: AppService) {}
 
-  @Get()
-  getHello(): string {
-    return this.appService.getHello();
-  }
-
   @Get('health')
   health() {
     return { status: 'ok' };
   }
 
-  @Get('me')
-  me(@CurrentUser() user: CurrentUserI) {
-    return ResponseFormatter.Ok({ data: user });
-  }
 }
